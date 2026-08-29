@@ -1,5 +1,6 @@
 const projects = window.PORTFOLIO_PROJECTS || [];
 const tags = (items) => items.map((item) => `<span>${item}</span>`).join("");
+const eventId = (id) => id.toLowerCase().replace(/[^a-z0-9]+/g, "_");
 
 const featuredCard = (p) => `
   <article class="work-card">
@@ -10,15 +11,21 @@ const featuredCard = (p) => `
       <aside><b>解決したかったこと</b><span>${p.problem}</span></aside>
       <ul>${p.features.map((f) => `<li>${f}</li>`).join("")}</ul>
       <div class="tags">${tags(p.tech)}</div>
-      <div class="actions"><a class="button small" href="${p.url}" target="_blank" rel="noopener noreferrer">使ってみる →</a>${p.github ? `<a class="text-link" href="${p.github}" target="_blank" rel="noopener noreferrer">GitHubを見る</a>` : ""}</div>
+      <div class="actions"><a class="button small" href="${p.url}" target="_blank" rel="noopener noreferrer" data-clarity-event="open_${eventId(p.id)}">使ってみる →</a>${p.github ? `<a class="text-link" href="${p.github}" target="_blank" rel="noopener noreferrer" data-clarity-event="open_github_${eventId(p.id)}">GitHubを見る</a>` : ""}</div>
     </div>
   </article>`;
 
 const miniCard = (p) => `
   <article class="mini-card">
     <div class="visual mini ${p.tone}"><span class="grid"></span><strong>${p.mark}</strong></div>
-    <div class="mini-body"><div class="meta"><span class="status">公開中</span><span>${p.id}</span></div><h3>${p.title}</h3><p>${p.summary}</p><div class="tags">${tags(p.tech)}</div><a class="arrow-link" href="${p.url}" target="_blank" rel="noopener noreferrer">使ってみる →</a></div>
+    <div class="mini-body"><div class="meta"><span class="status">公開中</span><span>${p.id}</span></div><h3>${p.title}</h3><p>${p.summary}</p><div class="tags">${tags(p.tech)}</div><a class="arrow-link" href="${p.url}" target="_blank" rel="noopener noreferrer" data-clarity-event="open_${eventId(p.id)}">使ってみる →</a></div>
   </article>`;
 
 document.querySelector("#featured-projects").innerHTML = projects.filter((p) => p.featured).map(featuredCard).join("");
 document.querySelector("#more-projects").innerHTML = projects.filter((p) => !p.featured).map(miniCard).join("");
+
+document.addEventListener("click", (event) => {
+  const link = event.target.closest("[data-clarity-event]");
+  if (!link || typeof window.clarity !== "function") return;
+  window.clarity("event", link.dataset.clarityEvent);
+});
