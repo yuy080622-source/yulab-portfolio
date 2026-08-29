@@ -1,5 +1,11 @@
 # Changelog
 
+## 2026-08-29（プライバシー表記）
+
+- Microsoft Clarityの利用、取得する行動データ、利用目的を説明する`privacy.html`を追加
+- トップページのフッターにアクセス分析の説明とプライバシーポリシー導線を追加
+- プライバシーポリシーへの遷移を`open_privacy`イベントで計測
+
 ## 2026-08-29
 
 - PRJ-004専用Microsoft Clarity（Project ID: `y9t440xzdg`）を導入
