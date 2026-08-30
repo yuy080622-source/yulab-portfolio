@@ -8,7 +8,7 @@
 - Clarity: `js/clarity.js`（Project ID: `y9t440xzdg`）および既存カスタムイベント処理は変更なし
 - プライバシー表記: Google Analyticsの利用、取得情報、Googleによる取り扱い、個人を直接特定する情報を意図的に送信しない旨を最小追記。トップページの分析ツール表記も更新
 - テスト結果: HTML構造・GA4設定数・Clarity残存・リンク不変・JS構文・差分チェックPASS。実ブラウザでPC 1280px / モバイル 390pxの表示、横あふれなし、作品カード5件、CTA、プライバシーページを確認
-- GitHub Pages公開状態: `main`反映後に公開ページと配信内容を確認する
+- GitHub Pages公開状態: `main`へ反映済み。公開中の`index.html`と`privacy.html`でGA4タグ、Clarity、プライバシー表記を確認し、Google tag配信先のHTTP 200を確認
 - GA4リアルタイム受信: GA4管理画面でPM確認が必要
 - 残課題: GA4 Realtime受信のPM確認
 - 保留事項: GA4カスタムイベント追加（今回は対象外）
