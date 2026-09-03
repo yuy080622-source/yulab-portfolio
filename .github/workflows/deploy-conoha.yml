@@ -24,7 +24,7 @@ jobs:
     env:
       FTP_SERVER: ${{ secrets.FTP_SERVER }}
       FTP_USERNAME: ${{ secrets.FTP_USERNAME }}
-      FTP_PASSWORD: ${{ secrets.FTP_PASSWORD }}
+      LFTP_PASSWORD: ${{ secrets.FTP_PASSWORD }}
       FTP_REMOTE_DIR: ${{ secrets.FTP_REMOTE_DIR }}
 
     steps:
@@ -36,12 +36,17 @@ jobs:
         run: |
           set -euo pipefail
 
-          for name in FTP_SERVER FTP_USERNAME FTP_PASSWORD FTP_REMOTE_DIR; do
+          for name in FTP_SERVER FTP_USERNAME FTP_REMOTE_DIR; do
             if [ -z "${!name:-}" ]; then
               echo "::error::GitHub Secret ${name} is not configured."
               exit 1
             fi
           done
+
+          if [ -z "${LFTP_PASSWORD:-}" ]; then
+            echo "::error::GitHub Secret FTP_PASSWORD is not configured."
+            exit 1
+          fi
 
           if [ "$FTP_SERVER" != "www1161.conoha.ne.jp" ]; then
             echo "::error::FTP_SERVER does not match the approved ConoHa server."
@@ -93,7 +98,7 @@ jobs:
           set ftp:ssl-protect-data yes
           set ftp:ssl-protect-list yes
           set ssl:verify-certificate yes
-          open --user "$FTP_USERNAME" --password "$FTP_PASSWORD" "ftp://$FTP_SERVER:21"
+          open --user "$FTP_USERNAME" --env-password "ftp://$FTP_SERVER:21"
           cd "$FTP_REMOTE_DIR"
           cls -1a > /tmp/conoha-remote-root.txt
           bye
@@ -121,7 +126,7 @@ jobs:
           set ftp:ssl-protect-data yes
           set ftp:ssl-protect-list yes
           set ssl:verify-certificate yes
-          open --user "$FTP_USERNAME" --password "$FTP_PASSWORD" "ftp://$FTP_SERVER:21"
+          open --user "$FTP_USERNAME" --env-password "ftp://$FTP_SERVER:21"
           cd "$FTP_REMOTE_DIR"
           mirror --reverse --verbose --only-newer --parallel=2 deploy/ ./
           bye
