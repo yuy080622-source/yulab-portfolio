@@ -78,7 +78,7 @@ jobs:
           FTP_REMOTE_DIR: ${{ secrets.FTP_REMOTE_DIR }}
         run: |
           set -euo pipefail
-          lftp -u "$FTP_USERNAME","$FTP_PASSWORD" -p 21 "ftp://$FTP_SERVER" <<LFTP > remote-listing.txt
+          lftp <<LFTP > remote-listing.txt
           set cmd:fail-exit yes
           set net:timeout 20
           set net:max-retries 3
@@ -89,6 +89,7 @@ jobs:
           set ftp:ssl-protect-data yes
           set ftp:ssl-protect-list yes
           set ssl:verify-certificate yes
+          open --user "$FTP_USERNAME" --password "$FTP_PASSWORD" "ftp://$FTP_SERVER:21"
           cd "$FTP_REMOTE_DIR"
           cls -1a
           bye
@@ -109,7 +110,7 @@ jobs:
           FTP_REMOTE_DIR: ${{ secrets.FTP_REMOTE_DIR }}
         run: |
           set -euo pipefail
-          lftp -u "$FTP_USERNAME","$FTP_PASSWORD" -p 21 "ftp://$FTP_SERVER" <<LFTP
+          lftp <<LFTP
           set cmd:fail-exit yes
           set net:timeout 20
           set net:max-retries 3
@@ -120,7 +121,9 @@ jobs:
           set ftp:ssl-protect-data yes
           set ftp:ssl-protect-list yes
           set ssl:verify-certificate yes
-          mirror --reverse --verbose --parallel=2 --no-perms --exclude-glob .DS_Store deploy/ "$FTP_REMOTE_DIR"
+          open --user "$FTP_USERNAME" --password "$FTP_PASSWORD" "ftp://$FTP_SERVER:21"
+          cd "$FTP_REMOTE_DIR"
+          mirror --reverse --verbose --parallel=2 --no-perms --exclude-glob .DS_Store deploy/ ./
           bye
           LFTP
 
