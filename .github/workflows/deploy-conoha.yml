@@ -53,7 +53,7 @@ jobs:
             exit 1
           fi
 
-          if [ "$FTP_USERNAME" != "portfolio@yulab-web.com" ]; then
+          if [ "$FTP_USERNAME" != "portfolio2@yulab-web.com" ]; then
             echo "::error::FTP_USERNAME is not the portfolio-only FTP account."
             exit 1
           fi
