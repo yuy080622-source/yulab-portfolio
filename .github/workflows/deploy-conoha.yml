@@ -10,79 +10,83 @@ permissions:
   contents: read
 
 concurrency:
-  group: deploy-conoha-portfolio
+  group: conoha-portfolio-production
   cancel-in-progress: false
 
 jobs:
   deploy:
+    name: Deploy to yulab-web.com/portfolio
     runs-on: ubuntu-latest
     timeout-minutes: 15
     environment:
-      name: production
+      name: conoha-portfolio-production
       url: https://yulab-web.com/portfolio/
+    env:
+      FTP_SERVER: ${{ secrets.FTP_SERVER }}
+      FTP_USERNAME: ${{ secrets.FTP_USERNAME }}
+      FTP_PASSWORD: ${{ secrets.FTP_PASSWORD }}
+      FTP_REMOTE_DIR: ${{ secrets.FTP_REMOTE_DIR }}
 
     steps:
       - name: Checkout main
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
 
-      - name: Validate deployment secrets
-        env:
-          FTP_SERVER: ${{ secrets.FTP_SERVER }}
-          FTP_USERNAME: ${{ secrets.FTP_USERNAME }}
-          FTP_PASSWORD: ${{ secrets.FTP_PASSWORD }}
-          FTP_REMOTE_DIR: ${{ secrets.FTP_REMOTE_DIR }}
+      - name: Validate deployment settings
+        shell: bash
         run: |
           set -euo pipefail
-          missing=()
+
           for name in FTP_SERVER FTP_USERNAME FTP_PASSWORD FTP_REMOTE_DIR; do
             if [ -z "${!name:-}" ]; then
-              missing+=("$name")
+              echo "::error::GitHub Secret ${name} is not configured."
+              exit 1
             fi
           done
-          if [ "${#missing[@]}" -gt 0 ]; then
-            echo "::error::Missing required Repository Secrets: ${missing[*]}"
-            exit 1
-          fi
-          if [ "$FTP_REMOTE_DIR" != "./" ]; then
-            echo "::error::FTP_REMOTE_DIR must be exactly ./ for the restricted portfolio FTP account."
+
+          if [ "$FTP_SERVER" != "www1161.conoha.ne.jp" ]; then
+            echo "::error::FTP_SERVER does not match the approved ConoHa server."
             exit 1
           fi
 
-      - name: Prepare public files
+          if [ "$FTP_USERNAME" != "portfolio@yulab-web.com" ]; then
+            echo "::error::FTP_USERNAME is not the portfolio-only FTP account."
+            exit 1
+          fi
+
+          if [ "$FTP_REMOTE_DIR" != "./" ]; then
+            echo "::error::FTP_REMOTE_DIR must be ./ because this FTP account is restricted to the portfolio directory."
+            exit 1
+          fi
+
+      - name: Build deployment directory
+        shell: bash
         run: |
           set -euo pipefail
           mkdir -p deploy/css deploy/js deploy/assets
+
           cp index.html privacy.html deploy/
           cp -R css/. deploy/css/
           cp -R js/. deploy/js/
           cp -R assets/. deploy/assets/
-          test -f deploy/index.html
-          echo "Files selected for deployment:"
+
+          echo "Files prepared for deployment:"
           find deploy -type f -print | sort
 
-      - name: Install lftp
+      - name: Install FTP client
+        shell: bash
         run: |
-          set -euo pipefail
-          for attempt in 1 2 3; do
-            sudo apt-get update && sudo apt-get install -y --no-install-recommends lftp && exit 0
-            echo "lftp installation attempt $attempt failed" >&2
-            sleep $((attempt * 5))
-          done
-          exit 1
+          sudo apt-get update
+          sudo apt-get install --yes lftp
 
       - name: Verify restricted FTP root
-        env:
-          FTP_SERVER: ${{ secrets.FTP_SERVER }}
-          FTP_USERNAME: ${{ secrets.FTP_USERNAME }}
-          FTP_PASSWORD: ${{ secrets.FTP_PASSWORD }}
-          FTP_REMOTE_DIR: ${{ secrets.FTP_REMOTE_DIR }}
+        shell: bash
         run: |
           set -euo pipefail
-          lftp <<LFTP > remote-listing.txt
+
+          lftp <<LFTP_COMMANDS
           set cmd:fail-exit yes
+          set net:max-retries 2
           set net:timeout 20
-          set net:max-retries 3
-          set net:reconnect-interval-base 5
           set ftp:ssl-allow yes
           set ftp:ssl-force yes
           set ftp:ssl-auth TLS
@@ -91,30 +95,26 @@ jobs:
           set ssl:verify-certificate yes
           open --user "$FTP_USERNAME" --password "$FTP_PASSWORD" "ftp://$FTP_SERVER:21"
           cd "$FTP_REMOTE_DIR"
-          cls -1a
+          cls -1a > /tmp/conoha-remote-root.txt
           bye
-          LFTP
+          LFTP_COMMANDS
 
-          sed -e 's#^\./##' -e 's#/$##' -e 's/\r$//' remote-listing.txt > remote-names.txt
-          if grep -E -x '(wp-admin|wp-content|wp-includes|index\.php|\.htaccess)' remote-names.txt; then
-            echo "::error::WordPress files were detected at the FTP root. Deployment stopped before upload."
+          if grep -Eq '^(wp-admin|wp-content|wp-includes|index\.php|\.htaccess)/?$' /tmp/conoha-remote-root.txt; then
+            echo "::error::WordPress files are visible at the FTP target. Deployment was stopped before upload."
             exit 1
           fi
-          echo "Restricted FTP root safety check passed."
 
-      - name: Upload additions and updates over explicit FTPS
-        env:
-          FTP_SERVER: ${{ secrets.FTP_SERVER }}
-          FTP_USERNAME: ${{ secrets.FTP_USERNAME }}
-          FTP_PASSWORD: ${{ secrets.FTP_PASSWORD }}
-          FTP_REMOTE_DIR: ${{ secrets.FTP_REMOTE_DIR }}
+          echo "FTP root safety check passed."
+
+      - name: Upload portfolio site
+        shell: bash
         run: |
           set -euo pipefail
-          lftp <<LFTP
+
+          lftp <<LFTP_COMMANDS
           set cmd:fail-exit yes
+          set net:max-retries 2
           set net:timeout 20
-          set net:max-retries 3
-          set net:reconnect-interval-base 5
           set ftp:ssl-allow yes
           set ftp:ssl-force yes
           set ftp:ssl-auth TLS
@@ -123,13 +123,8 @@ jobs:
           set ssl:verify-certificate yes
           open --user "$FTP_USERNAME" --password "$FTP_PASSWORD" "ftp://$FTP_SERVER:21"
           cd "$FTP_REMOTE_DIR"
-          mirror --reverse --verbose --parallel=2 --no-perms --exclude-glob .DS_Store deploy/ ./
+          mirror --reverse --verbose --only-newer --parallel=2 deploy/ ./
           bye
-          LFTP
+          LFTP_COMMANDS
 
-      - name: Deployment summary
-        run: |
-          echo "### ConoHa WING deployment completed" >> "$GITHUB_STEP_SUMMARY"
-          echo "- Source: \`${GITHUB_REPOSITORY}@${GITHUB_SHA}\`" >> "$GITHUB_STEP_SUMMARY"
-          echo "- Destination: https://yulab-web.com/portfolio/" >> "$GITHUB_STEP_SUMMARY"
-          echo "- Mode: additions and overwrites only (no remote deletion)" >> "$GITHUB_STEP_SUMMARY"
+          echo "Deployment completed: https://yulab-web.com/portfolio/"
